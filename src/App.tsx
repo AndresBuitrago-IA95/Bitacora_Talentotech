@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Upload, FileCode, Search, Sparkles, Loader2, LogOut, User, ShieldCheck } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { NotebookRenderer } from './components/NotebookRenderer';
@@ -7,73 +7,216 @@ import { LoginModal } from './components/LoginModal';
 import { generateExercises, partitionDays } from './services/geminiService';
 import { Notebook, DayContent, Exercise, NotebookCell } from './types';
 import { cn } from './lib/utils';
+import { auth, db, logout } from './services/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { 
+  doc, onSnapshot, setDoc, updateDoc, 
+  collection, getDocs, writeBatch, serverTimestamp, 
+  getDoc, query, where, arrayUnion
+} from 'firebase/firestore';
 
 export default function App() {
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userRole, setUserRole] = useState<'admin' | 'campista' | null>(null);
   const [notebook, setNotebook] = useState<Notebook | null>(null);
-  const [days, setDays] = useState<{ id: string; title: string; cellRange: [number, number] }[]>([]);
+  const [days, setDays] = useState<{ id: string; title: string; order: number; cellRange: [number, number] }[]>([]);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [dayContents, setDayContents] = useState<Record<string, NotebookCell[]>>({});
   const [exercises, setExercises] = useState<Record<string, Exercise[]>>({});
   const [isLoadingExercises, setIsLoadingExercises] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [completedDays, setCompletedDays] = useState<Set<string>>(new Set());
+  
+  const completedDays = useMemo(() => {
+    const set = new Set<string>();
+    Object.entries(exercises).forEach(([dayId, dayExs]) => {
+      if (dayExs.length > 0 && dayExs.every(ex => ex.completed)) {
+        set.add(dayId);
+      }
+    });
+    return set;
+  }, [exercises]);
+
+  // Listen for Auth changes
+  useEffect(() => {
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (u) {
+        // Auto-determine role if email matches admin
+        if (u.email === 'andrezbuitrago82@gmail.com') {
+          // If already logged in, we still might want the password confirmation 
+          // but for persistence, let's allow it
+          setUserRole('admin');
+        } else {
+          setUserRole('campista');
+        }
+      }
+    });
+  }, []);
+
+  // Sync Global Bootcamp Data
+  useEffect(() => {
+    // 1. Sync Notebook Metadata
+    const unsubMeta = onSnapshot(doc(db, 'config', 'notebook'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setNotebook({ cells: [], metadata: {} } as any); // Marker that we have a notebook
+      } else {
+        setNotebook(null);
+      }
+    });
+
+    // 2. Sync Days list
+    const unsubDays = onSnapshot(collection(db, 'days'), (snap) => {
+      const daysList = snap.docs.map(d => d.data() as any).sort((a, b) => a.order - b.order);
+      setDays(daysList);
+      if (!selectedDayId && daysList.length > 0) setSelectedDayId(daysList[0].id);
+    });
+
+    return () => {
+      unsubMeta();
+      unsubDays();
+    };
+  }, [selectedDayId]);
+
+  // Sync Current Day Content & Exercises
+  useEffect(() => {
+    if (!selectedDayId) return;
+
+    const unsubContent = onSnapshot(doc(db, 'content', selectedDayId), (snap) => {
+      if (snap.exists()) {
+        setDayContents(prev => ({ ...prev, [selectedDayId]: snap.data().cells }));
+      }
+    });
+
+    const unsubExs = onSnapshot(doc(db, 'exercises', selectedDayId), (snap) => {
+      if (snap.exists()) {
+        setExercises(prev => ({ ...prev, [selectedDayId]: snap.data().exercises }));
+      }
+    });
+
+    return () => {
+      unsubContent();
+      unsubExs();
+    };
+  }, [selectedDayId]);
+
+  // Sync User Progress
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubProgress = onSnapshot(collection(db, 'users', user.uid, 'progress'), (snap) => {
+      const completedIds = snap.docs.filter(d => d.data().completed).map(d => d.id);
+      
+      // Update exercises status based on progress
+      setExercises(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(dayId => {
+          next[dayId] = next[dayId].map(ex => ({
+            ...ex,
+            completed: completedIds.includes(ex.id) || ex.completed
+          }));
+        });
+        return next;
+      });
+
+      // Update completed days (if all day exercises are in completedIds)
+      // This is a bit complex in real-time, but let's approximate
+    });
+
+    return () => unsubProgress();
+  }, [user]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || userRole !== 'admin') return;
 
     setIsUploading(true);
     try {
       const text = await file.text();
       const nb: Notebook = JSON.parse(text);
-      setNotebook(nb);
-      
       const partitioned = await partitionDays(nb.cells);
-      setDays(partitioned);
-      setSelectedDayId(partitioned[0]?.id || null);
+
+      // Persist to Firestore
+      const batch = writeBatch(db);
+      
+      // Update metadata
+      batch.set(doc(db, 'config', 'notebook'), {
+        title: file.name,
+        lastUpdated: serverTimestamp(),
+        totalDays: partitioned.length
+      });
+
+      // Clear old days (simulated by overwriting or resetting manually if needed)
+      // Here we replace them
+      partitioned.forEach((day, index) => {
+        const dayId = `day-${index + 1}`;
+        batch.set(doc(db, 'days', dayId), { ...day, id: dayId, order: index });
+        
+        // Split cells per day
+        const cells = nb.cells.slice(day.cellRange[0], day.cellRange[1]);
+        batch.set(doc(db, 'content', dayId), { cells });
+      });
+
+      await batch.commit();
+      
+      setNotebook(nb);
+      const daysWithOrder = partitioned.map((day, index) => ({ ...day, order: index }));
+      setDays(daysWithOrder);
+      setSelectedDayId(`day-1`);
     } catch (error) {
-      console.error("Error parsing notebook:", error);
-      alert("Error al procesar el archivo .ipynb. Asegúrate que sea un formato válido.");
+      console.error("Error persistenting notebook:", error);
+      alert("Error al procesar y guardar el notebook.");
     } finally {
       setIsUploading(false);
     }
   };
 
   const selectedDayCells = useMemo(() => {
-    if (!notebook || !selectedDayId) return [];
-    const day = days.find(d => d.id === selectedDayId);
-    if (!day) return [];
-    return notebook.cells.slice(day.cellRange[0], day.cellRange[1]);
-  }, [notebook, selectedDayId, days]);
+    return dayContents[selectedDayId || ""] || [];
+  }, [dayContents, selectedDayId]);
 
   const handleGenerateExercises = async () => {
-    if (!selectedDayId || !selectedDayCells.length) return;
+    if (!selectedDayId || !selectedDayCells.length || userRole !== 'admin') return;
     
     setIsLoadingExercises(true);
     try {
       const generated = await generateExercises(selectedDayCells);
-      setExercises(prev => ({ ...prev, [selectedDayId]: generated }));
+      await setDoc(doc(db, 'exercises', selectedDayId), { exercises: generated });
+    } catch (err) {
+      console.error("Error generating/saving exercises:", err);
     } finally {
       setIsLoadingExercises(false);
     }
   };
 
-  const handleExerciseComplete = (exId: string, userCode: string, output: string) => {
-    if (!selectedDayId) return;
+  const handleExerciseComplete = async (exId: string, userCode: string, output: string) => {
+    if (!selectedDayId || !user) return;
 
+    // Local update for UI snappiness
     setExercises(prev => {
       const dayExs = prev[selectedDayId] || [];
       const updated = dayExs.map(ex => 
-        ex.id === exId ? { ...ex, completed: true, userCode, output } : ex
+        ex.id === exId ? { ...ex, completed: true } : ex
       );
-      
-      // Check if all exercises are complete for this day
-      if (updated.every(e => e.completed)) {
-        setCompletedDays(prevSet => new Set([...prevSet, selectedDayId]));
-      }
-
       return { ...prev, [selectedDayId]: updated };
     });
+
+    // Persistent update for user progress
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'progress', exId), {
+        completed: true,
+        userCode,
+        output,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Error saving progress:", err);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setUserRole(null);
   };
 
   if (!userRole) {
@@ -114,7 +257,7 @@ export default function App() {
                 {userRole === 'admin' ? "Administrador" : "Campista"}
               </div>
               <button 
-                onClick={() => setUserRole(null)}
+                onClick={handleLogout}
                 className="text-[10px] text-slate-500 hover:text-red-400 transition-colors uppercase font-bold tracking-widest mt-0.5"
               >
                 Cerrar Sesión

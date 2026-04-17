@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "NotebookMetadata": {
+      "title": "Notebook Metadata",
+      "description": "Metadata for the currently active bootcamp notebook",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "totalDays": { "type": "number" }
+      },
+      "required": ["title", "lastUpdated"]
+    },
+    "Day": {
+      "title": "Bootcamp Day",
+      "description": "Metadata for a specific day/module",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "order": { "type": "number" },
+        "cellRange": { "type": "array", "items": { "type": "number" } }
+      },
+      "required": ["id", "title", "order"]
+    },
+    "Cell": {
+      "title": "Notebook Cell",
+      "description": "A single notebook cell serialized",
+      "type": "object",
+      "properties": {
+        "cell_type": { "type": "string", "enum": ["markdown", "code"] },
+        "source": { "type": "array", "items": { "type": "string" } },
+        "metadata": { "type": "object" },
+        "outputs": { "type": "array" },
+        "execution_count": { "type": "number" }
+      }
+    },
+    "Exercise": {
+      "title": "Python Exercise",
+      "description": "AI generated exercise for a specific day",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "solution_hint": { "type": "string" },
+        "completed": { "type": "boolean" }
+      }
+    },
+    "UserProgress": {
+      "title": "User Progress",
+      "description": "Stored progress for a student per exercise",
+      "type": "object",
+      "properties": {
+        "completed": { "type": "boolean" },
+        "userCode": { "type": "string" },
+        "lastOutput": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/config/notebook": {
+      "schema": "NotebookMetadata",
+      "description": "Singleton for current notebook metadata"
+    },
+    "/days/{dayId}": {
+      "schema": "Day",
+      "description": "Collection of available days/modules"
+    },
+    "/content/{dayId}": {
+      "schema": "object",
+      "description": "Stores the array of serialized cells for a day"
+    },
+    "/exercises/{dayId}": {
+      "schema": "object",
+      "description": "Stores the array of exercises for a day"
+    },
+    "/users/{userId}/progress/{exerciseId}": {
+      "schema": "UserProgress",
+      "description": "Individual exercise completion status per user"
+    }
+  }
+}

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, User, ShieldCheck, GraduationCap, ArrowRight, AlertCircle } from 'lucide-react';
+import { Lock, User, ShieldCheck, GraduationCap, ArrowRight, AlertCircle, Chrome } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { loginWithGoogle, auth } from '../services/firebase';
 
 type Role = 'admin' | 'campista';
 
@@ -13,17 +14,37 @@ export function LoginModal({ onLogin }: LoginModalProps) {
   const [role, setRole] = useState<Role>('campista');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role === 'admin') {
-      if (password === 'Ingeniero95*') {
-        onLogin('admin');
+    setIsAuthenticating(true);
+    setError('');
+
+    try {
+      const result = await loginWithGoogle();
+      const user = result.user;
+
+      if (role === 'admin') {
+        // Strict check: Only specific email + specific password
+        const isAdminEmail = user.email === 'andrezbuitrago82@gmail.com';
+        const isCorrectPassword = password === 'Ingeniero95*';
+
+        if (isAdminEmail && isCorrectPassword) {
+          onLogin('admin');
+        } else if (!isAdminEmail) {
+          setError('Este usuario de Google no tiene permisos administrativos.');
+        } else {
+          setError('Contraseña administrativa incorrecta.');
+        }
       } else {
-        setError('Contraseña administrativa incorrecta');
+        onLogin('campista');
       }
-    } else {
-      onLogin('campista');
+    } catch (err: any) {
+      console.error("Auth error:", err);
+      setError('Error al autenticar con Google. Intenta de nuevo.');
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 
@@ -115,10 +136,18 @@ export function LoginModal({ onLogin }: LoginModalProps) {
 
           <button
             type="submit"
-            className="w-full bg-sky-400 text-slate-950 py-4 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-sky-300 transition-all flex items-center justify-center gap-2 group"
+            disabled={isAuthenticating}
+            className="w-full bg-sky-400 text-slate-950 py-4 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-sky-300 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
           >
-            Entrar al Portal
-            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+            {isAuthenticating ? (
+              <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <Chrome className="w-4 h-4" />
+                Validar con Google
+              </>
+            )}
+            {!isAuthenticating && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
           </button>
         </form>
 
