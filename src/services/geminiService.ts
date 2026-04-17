@@ -14,6 +14,11 @@ export async function generateExercises(cells: NotebookCell[]): Promise<Exercise
     Based on the following educational material (from a Jupyter Notebook), generate 3 practical Python exercises.
     Each exercise should be challenging but solvable using the concepts discussed in the text.
     
+    IMPORTANT CONSTRAINTS:
+    - DO NOT generate exercises that require interactive user input (e.g., do not use input() function).
+    - The exercises should be based on data processing, calculations, or logic that can be executed and verified by outputting results (print).
+    - Provide a clear solution hint.
+    
     Material:
     ${content}
   `;

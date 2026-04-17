@@ -24,11 +24,18 @@ export async function runPythonCode(code: string): Promise<{ output: string; err
   try {
     const pyodide = await getPyodide();
     
-    // Redirect stdout to a variable
+    // Redirect stdout to a variable and mock input() to prevent I/O errors
     pyodide.runPython(`
 import sys
 import io
 sys.stdout = io.StringIO()
+
+def mocked_input(prompt=""):
+    print(f"(Lectura de input simulada: {prompt})")
+    return ""
+
+import builtins
+builtins.input = mocked_input
     `);
     
     await pyodide.runPythonAsync(code);

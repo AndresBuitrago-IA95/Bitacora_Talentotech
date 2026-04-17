@@ -48,6 +48,8 @@ export function LoginModal({ onLogin }: LoginModalProps) {
       // Detailed error for debugging
       if (err.code === 'auth/unauthorized-domain') {
         setError(`Dominio no autorizado. Añade ${window.location.hostname} en Firebase Console.`);
+      } else if (err.code === 'auth/admin-restricted-operation') {
+        setError("Acceso anónimo deshabilitado. Activa 'Anonymous Auth' en Firebase Console > Authentication > Sign-in method.");
       } else if (err.code === 'auth/popup-closed-by-user') {
         setError('La ventana se cerró antes de completar.');
       } else {

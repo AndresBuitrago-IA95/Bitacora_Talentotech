@@ -176,7 +176,7 @@ export default function App() {
   }, [dayContents, selectedDayId]);
 
   const handleGenerateExercises = async () => {
-    if (!selectedDayId || !selectedDayCells.length || userRole !== 'admin') return;
+    if (!selectedDayId || !selectedDayCells.length) return;
     
     setIsLoadingExercises(true);
     try {
@@ -265,31 +265,32 @@ export default function App() {
             </div>
 
             {userRole === 'admin' && (
-              <>
-                <label className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                  "bg-sky-400 text-slate-950 hover:bg-sky-300 hover:shadow-lg hover:shadow-sky-400/20 active:scale-[0.98]"
-                )}>
-                  <Upload className="w-4 h-4" />
-                  <span>{isUploading ? "Subiendo..." : "Subir IPYNB"}</span>
-                  <input type="file" accept=".ipynb" className="hidden" onChange={handleFileUpload} />
-                </label>
+              <label className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                "bg-sky-400 text-slate-950 hover:bg-sky-300 hover:shadow-lg hover:shadow-sky-400/20 active:scale-[0.98]"
+              )}>
+                <Upload className="w-4 h-4" />
+                <span>{isUploading ? "Subiendo..." : "Subir IPYNB"}</span>
+                <input type="file" accept=".ipynb" className="hidden" onChange={handleFileUpload} />
+              </label>
+            )}
 
-                {selectedDayId && !exercises[selectedDayId] && (
-                  <button
-                    onClick={handleGenerateExercises}
-                    disabled={isLoadingExercises}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-white/5 text-white rounded-lg text-xs font-bold hover:bg-white/10 transition-all disabled:opacity-50 border border-white/5"
-                  >
-                    {isLoadingExercises ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 text-sky-400" />
-                    )}
-                    <span>Generar Ejercicios IA</span>
-                  </button>
+            {selectedDayId && !exercises[selectedDayId] && (
+              <button
+                onClick={handleGenerateExercises}
+                disabled={isLoadingExercises}
+                className="flex items-center gap-2 px-5 py-2.5 bg-white/5 text-white rounded-lg text-xs font-bold hover:bg-white/10 transition-all disabled:opacity-50 border border-white/5 shadow-xl shadow-sky-500/5 group"
+              >
+                {isLoadingExercises ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+                ) : (
+                  <Sparkles className="w-4 h-4 text-sky-400 group-hover:scale-125 transition-transform" />
                 )}
-              </>
+                <div className="flex flex-col items-start leading-none gap-1">
+                  <span className="text-[10px] font-black uppercase tracking-widest">{isLoadingExercises ? "Generando..." : "Sugerir Retos IA"}</span>
+                  {!isLoadingExercises && <span className="text-[8px] text-slate-500 font-bold uppercase">Basado en el material</span>}
+                </div>
+              </button>
             )}
           </div>
         </header>
