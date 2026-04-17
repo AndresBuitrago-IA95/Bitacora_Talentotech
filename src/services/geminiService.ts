@@ -15,8 +15,8 @@ export async function generateExercises(cells: NotebookCell[]): Promise<Exercise
     Each exercise should be challenging but solvable using the concepts discussed in the text.
     
     IMPORTANT CONSTRAINTS:
-    - DO NOT generate exercises that require interactive user input (e.g., do not use input() function).
-    - The exercises should be based on data processing, calculations, or logic that can be executed and verified by outputting results (print).
+    - You MAY generate exercises that require interactive user input (using input() function), as it is now supported via a browser prompt.
+    - The exercises should focus on data processing, calculations, or logic that can be executed and verified by outputting results (print).
     - Provide a clear solution hint.
     
     Material:

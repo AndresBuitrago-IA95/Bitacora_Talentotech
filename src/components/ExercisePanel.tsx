@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Exercise } from '../types';
 import { runPythonCode } from '../services/pythonRunner';
-import { Play, CheckCircle2, Circle, ChevronRight, XCircle, Info, Sparkles } from 'lucide-react';
+import { Play, CheckCircle2, CheckCircle, ExternalLink, Sparkles, BookOpen, Terminal } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -29,11 +29,13 @@ export function ExercisePanel({ exercises, onComplete }: ExercisePanelProps) {
     const result = await runPythonCode(code);
     setResults(prev => ({ ...prev, [ex.id]: result }));
     setIsRunning(false);
-    
-    // Auto-complete if no error and some output (simplified logic)
-    if (!result.error && result.output.length > 0) {
-      onComplete(ex.id, code, result.output);
-    }
+  };
+
+  const handleOpenColab = (ex: Exercise) => {
+    const baseCode = `# ${ex.title}\n# ${ex.description}\n\n${codes[ex.id] || "# Escribe tu solución aquí..."}`;
+    const encodedCode = encodeURIComponent(baseCode);
+    const colabUrl = `https://colab.research.google.com/notebook#create=true&language=python&mode=snippets&snippet=${encodedCode}`;
+    window.open(colabUrl, '_blank');
   };
 
   return (
@@ -91,56 +93,66 @@ export function ExercisePanel({ exercises, onComplete }: ExercisePanelProps) {
                   <div className="space-y-4">
                     <div className="bg-black/60 rounded-xl overflow-hidden border border-white/5">
                       <div className="bg-white/5 px-4 py-2 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Python 3.10 | Editor</span>
-                        <div className="flex gap-1.5">
-                           <div className="w-2 h-2 rounded-full bg-slate-700" />
-                           <div className="w-2 h-2 rounded-full bg-slate-700" />
-                           <div className="w-2 h-2 rounded-full bg-slate-700" />
+                        <div className="flex items-center gap-2">
+                          <Terminal className="w-3 h-3 text-sky-400" />
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Editor Python</span>
                         </div>
+                        <button
+                          onClick={() => handleOpenColab(ex)}
+                          className="flex items-center gap-1.5 px-2 py-1 bg-white/5 hover:bg-white/10 rounded-md transition-all text-slate-400 hover:text-[#f9ab00]"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Colab</span>
+                        </button>
                       </div>
                       <textarea
                         value={codes[ex.id] || ""}
                         onChange={(e) => setCodes(prev => ({ ...prev, [ex.id]: e.target.value }))}
                         placeholder="# Escribe tu solución aquí..."
-                        className="w-full h-48 p-6 font-mono text-sm bg-transparent text-sky-100 outline-none resize-none placeholder:text-slate-700"
+                        className="w-full h-40 p-5 font-mono text-sm bg-transparent text-sky-100 outline-none resize-none placeholder:text-slate-700"
                       />
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                       <button
                         onClick={() => handleRun(ex)}
                         disabled={isRunning}
-                        className="flex-1 flex items-center justify-center gap-2 bg-sky-400 text-slate-950 px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-sky-300 transition-all active:scale-[0.98] disabled:opacity-50"
+                        className="flex-[2] flex items-center justify-center gap-2 bg-sky-400 text-slate-950 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-sky-300 transition-all active:scale-[0.98] disabled:opacity-50"
                       >
-                        <Play className="w-3.5 h-3.5 fill-current" />
+                        {isRunning ? (
+                          <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        )}
                         {isRunning ? "Ejecutando..." : "Ejecutar Código"}
                       </button>
+                      
                       <button
                         onClick={() => onComplete(ex.id, codes[ex.id] || "", results[ex.id]?.output || "")}
                         className={cn(
-                          "flex-1 px-4 py-2.5 rounded-lg text-sm font-bold transition-all",
+                          "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
                           ex.completed 
-                            ? "bg-emerald-500 text-white cursor-default" 
-                            : "bg-white/5 text-slate-200 hover:bg-white/10 border border-white/5"
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                            : "bg-white text-slate-950 hover:bg-slate-200"
                         )}
                       >
-                        {ex.completed ? "Completado" : "Marcar Completado"}
+                        {ex.completed ? <CheckCircle className="mx-auto w-4 h-4" /> : "Marcar"}
                       </button>
                     </div>
-                  </div>
 
-                  {(results[ex.id]?.output || results[ex.id]?.error) && (
-                    <div className={cn(
-                      "rounded-lg p-5 font-mono text-xs border animate-in fade-in slide-in-from-top-2",
-                      results[ex.id]?.error ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-black/40 text-slate-300 border-white/5"
-                    )}>
-                      {results[ex.id]?.error ? (
-                        <pre className="whitespace-pre-wrap">{results[ex.id]?.error}</pre>
-                      ) : (
-                        <pre className="whitespace-pre-wrap">{results[ex.id]?.output || "Output exitoso"}</pre>
-                      )}
-                    </div>
-                  )}
+                    {results[ex.id] && (
+                      <div className={cn(
+                        "rounded-xl p-4 font-mono text-xs border overflow-x-auto",
+                        results[ex.id].error ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-black/40 text-slate-300 border-white/5"
+                      )}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[9px] font-bold uppercase tracking-widest opacity-50">Consola Output</span>
+                          {results[ex.id].error && <span className="text-[9px] font-bold text-red-400 uppercase tracking-widest">Error de Ejecución</span>}
+                        </div>
+                        <pre className="whitespace-pre-wrap">{results[ex.id].error || results[ex.id].output || "Código ejecutado sin output"}</pre>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="text-slate-500 text-[10px] font-medium uppercase tracking-wider flex items-center gap-2">
                     <div className="w-1 h-1 rounded-full bg-sky-400" />

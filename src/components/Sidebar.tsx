@@ -1,15 +1,17 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import { Calendar, CheckCircle2, BookOpen } from 'lucide-react';
+import { Calendar, CheckCircle2, BookOpen, Trash2 } from 'lucide-react';
 
 interface SidebarProps {
   days: { id: string; title: string }[];
   selectedDayId: string | null;
   onSelectDay: (id: string) => void;
+  onDeleteDay?: (id: string) => void;
   completedDays: Set<string>;
+  isAdmin?: boolean;
 }
 
-export function Sidebar({ days, selectedDayId, onSelectDay, completedDays }: SidebarProps) {
+export function Sidebar({ days, selectedDayId, onSelectDay, onDeleteDay, completedDays, isAdmin }: SidebarProps) {
   return (
     <div className="w-64 h-full bg-slate-900 border-r border-white/10 flex flex-col">
       <div className="p-6">
@@ -44,6 +46,19 @@ export function Sidebar({ days, selectedDayId, onSelectDay, completedDays }: Sid
                   {day.title}
                 </span>
               </div>
+              {isAdmin && onDeleteDay && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`¿Estás seguro de eliminar el "${day.title}"? Esta acción no se puede deshacer.`)) {
+                      onDeleteDay(day.id);
+                    }
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-md transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </button>
           ))}
         </nav>

@@ -126,6 +126,28 @@ export default function App() {
     return () => unsubProgress();
   }, [user]);
 
+  const handleDeleteDay = async (dayId: string) => {
+    if (userRole !== 'admin') return;
+    
+    try {
+      const batch = writeBatch(db);
+      // Delete from days collection
+      batch.delete(doc(db, 'days', dayId));
+      // Delete from content collection
+      batch.delete(doc(db, 'content', dayId));
+      // Delete from exercises collection
+      batch.delete(doc(db, 'exercises', dayId));
+      
+      await batch.commit();
+      
+      if (selectedDayId === dayId) {
+        setSelectedDayId(days.find(d => d.id !== dayId)?.id || null);
+      }
+    } catch (err) {
+      console.error("Error deleting day:", err);
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || userRole !== 'admin') return;
@@ -139,6 +161,10 @@ export default function App() {
       // Persist to Firestore
       const batch = writeBatch(db);
       
+      // Clear existing days first
+      const existingDays = await getDocs(collection(db, 'days'));
+      existingDays.forEach(d => batch.delete(d.ref));
+
       // Update metadata
       batch.set(doc(db, 'config', 'notebook'), {
         title: file.name,
@@ -230,7 +256,9 @@ export default function App() {
         days={days} 
         selectedDayId={selectedDayId} 
         onSelectDay={setSelectedDayId}
+        onDeleteDay={handleDeleteDay}
         completedDays={completedDays}
+        isAdmin={userRole === 'admin'}
       />
 
       {/* Main Content Area */}
