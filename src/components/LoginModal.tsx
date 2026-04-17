@@ -70,14 +70,14 @@ export function LoginModal({ onLogin }: LoginModalProps) {
       <motion.div 
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        className="w-full max-w-md bg-slate-900 border border-white/5 rounded-[2rem] p-10 shadow-2xl relative z-10"
+        className="w-full max-w-md bg-slate-900 border border-white/5 rounded-[2rem] p-6 sm:p-10 shadow-2xl relative z-10"
       >
-        <div className="flex flex-col items-center text-center mb-10">
-          <div className="w-16 h-16 rounded-2xl bg-sky-400 flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(56,189,248,0.3)]">
-            <Lock className="w-8 h-8 text-slate-950" />
+        <div className="flex flex-col items-center text-center mb-6 sm:mb-10">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-sky-400 flex items-center justify-center mb-4 sm:mb-6 shadow-[0_0_20px_rgba(56,189,248,0.3)]">
+            <Lock className="w-6 h-6 sm:w-8 sm:h-8 text-slate-950" />
           </div>
-          <h1 className="text-3xl font-black tracking-tighter text-white uppercase italic">Acceso Bitácora</h1>
-          <p className="text-slate-400 mt-2 text-sm font-medium">Selecciona tu perfil para continuar</p>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter text-white uppercase italic text-center">Acceso Bitácora</h1>
+          <p className="text-slate-400 mt-2 text-xs sm:text-sm font-medium">Selecciona tu perfil para continuar</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

@@ -39,8 +39,8 @@ export function ExercisePanel({ exercises, onComplete }: ExercisePanelProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0f172a] border-l border-white/5 overflow-hidden">
-      <div className="p-8 border-b border-white/5 bg-slate-900/40">
+    <div className="flex flex-col h-full bg-[#0f172a] lg:border-l border-white/5 overflow-hidden">
+      <div className="p-6 lg:p-8 border-b border-white/5 bg-slate-900/40">
         <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
           Ejercicio Propuesto
         </h2>

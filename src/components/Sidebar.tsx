@@ -13,12 +13,13 @@ interface SidebarProps {
 
 export function Sidebar({ days, selectedDayId, onSelectDay, onDeleteDay, completedDays, isAdmin }: SidebarProps) {
   return (
-    <div className="w-64 h-full bg-slate-900 border-r border-white/10 flex flex-col">
+    <div className="w-64 lg:w-72 h-full bg-slate-900 border-r border-white/10 flex flex-col shadow-2xl">
       <div className="p-6">
-        <div className="flex items-center gap-2 mb-8">
-          <div className="text-xl font-black tracking-tighter text-sky-400">
+        <div className="flex items-center justify-between gap-2 mb-8">
+          <div className="text-xl font-black tracking-tighter text-sky-400 italic">
             PY-LOGBOOK
           </div>
+          {/* Mobile close button is handled by overlay click, but we can add an icon if needed */}
         </div>
         
         <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-1">
