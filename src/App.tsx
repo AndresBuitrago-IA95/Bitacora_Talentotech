@@ -165,22 +165,24 @@ export default function App() {
       // Persist to Firestore
       const batch = writeBatch(db);
       
-      // Clear existing days first
-      const existingDays = await getDocs(collection(db, 'days'));
-      existingDays.forEach(d => batch.delete(d.ref));
+      // Get current days count to append correctly
+      const existingDaysQuery = await getDocs(collection(db, 'days'));
+      const existingCount = existingDaysQuery.size;
+      const currentMaxOrder = existingDaysQuery.docs.reduce((max, d) => Math.max(max, d.data().order ?? 0), -1);
 
-      // Update metadata
+      // Update metadata (append to existing context)
       batch.set(doc(db, 'config', 'notebook'), {
         title: file.name,
         lastUpdated: serverTimestamp(),
-        totalDays: partitioned.length
-      });
+        totalDays: existingCount + partitioned.length
+      }, { merge: true });
 
-      // Clear old days (simulated by overwriting or resetting manually if needed)
-      // Here we replace them
       partitioned.forEach((day, index) => {
-        const dayId = `day-${index + 1}`;
-        batch.set(doc(db, 'days', dayId), { ...day, id: dayId, order: index });
+        const newIndex = existingCount + index + 1;
+        const dayId = `day-${newIndex}`;
+        const order = currentMaxOrder + index + 1;
+        
+        batch.set(doc(db, 'days', dayId), { ...day, id: dayId, order: order });
         
         // Split cells per day
         const cells = nb.cells.slice(day.cellRange[0], day.cellRange[1]);
@@ -189,10 +191,8 @@ export default function App() {
 
       await batch.commit();
       
-      setNotebook(nb);
-      const daysWithOrder = partitioned.map((day, index) => ({ ...day, order: index }));
-      setDays(daysWithOrder);
-      setSelectedDayId(`day-1`);
+      // Select the first of the newly added days
+      setSelectedDayId(`day-${existingCount + 1}`);
     } catch (error) {
       console.error("Error persistenting notebook:", error);
       alert("Error al procesar y guardar el notebook.");
