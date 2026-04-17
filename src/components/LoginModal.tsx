@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, User, ShieldCheck, GraduationCap, ArrowRight, AlertCircle, Chrome } from 'lucide-react';
+import { Lock, User, ShieldCheck, GraduationCap, ArrowRight, AlertCircle, Chrome, Zap } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { loginWithGoogle, auth } from '../services/firebase';
+import { loginWithGoogle, loginAnonymously, auth } from '../services/firebase';
 
 type Role = 'admin' | 'campista';
 
@@ -22,27 +22,37 @@ export function LoginModal({ onLogin }: LoginModalProps) {
     setError('');
 
     try {
-      const result = await loginWithGoogle();
-      const user = result.user;
-
       if (role === 'admin') {
-        // Strict check: Only specific email + specific password
-        const isAdminEmail = user.email === 'andrezbuitrago82@gmail.com';
-        const isCorrectPassword = password === 'Ingeniero95*';
-
-        if (isAdminEmail && isCorrectPassword) {
-          onLogin('admin');
-        } else if (!isAdminEmail) {
-          setError('Este usuario de Google no tiene permisos administrativos.');
-        } else {
+        // First check password to avoid unnecessary popups
+        if (password !== 'Ingeniero95*') {
           setError('Contraseña administrativa incorrecta.');
+          setIsAuthenticating(false);
+          return;
+        }
+
+        const result = await loginWithGoogle();
+        const user = result.user;
+
+        if (user.email === 'andrezbuitrago82@gmail.com') {
+          onLogin('admin');
+        } else {
+          setError(`El correo ${user.email} no tiene permisos de admin.`);
         }
       } else {
+        // Campista uses anonymous login for simplicity and persistence
+        await loginAnonymously();
         onLogin('campista');
       }
     } catch (err: any) {
       console.error("Auth error:", err);
-      setError('Error al autenticar con Google. Intenta de nuevo.');
+      // Detailed error for debugging
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(`Dominio no autorizado. Añade ${window.location.hostname} en Firebase Console.`);
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('La ventana se cerró antes de completar.');
+      } else {
+        setError(`Error: ${err.message || 'Fallo en autenticación'}`);
+      }
     } finally {
       setIsAuthenticating(false);
     }
@@ -137,14 +147,19 @@ export function LoginModal({ onLogin }: LoginModalProps) {
           <button
             type="submit"
             disabled={isAuthenticating}
-            className="w-full bg-sky-400 text-slate-950 py-4 rounded-xl font-black uppercase tracking-widest text-sm hover:bg-sky-300 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+            className={cn(
+              "w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-3 group disabled:opacity-50 shadow-xl",
+              role === 'admin' 
+                ? "bg-sky-400 text-slate-950 hover:bg-sky-300 shadow-sky-400/20" 
+                : "bg-white text-slate-950 hover:bg-slate-200 shadow-white/10"
+            )}
           >
             {isAuthenticating ? (
               <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <Chrome className="w-4 h-4" />
-                Validar con Google
+                {role === 'admin' ? <Chrome className="w-4 h-4" /> : <Zap className="w-4 h-4 fill-current" />}
+                {role === 'admin' ? "Validar con Google" : "Entrar como Campista"}
               </>
             )}
             {!isAuthenticating && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
