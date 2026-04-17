@@ -1,17 +1,18 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import { Calendar, CheckCircle2, BookOpen, Trash2 } from 'lucide-react';
+import { Calendar, CheckCircle2, BookOpen, Trash2, Edit2 } from 'lucide-react';
 
 interface SidebarProps {
   days: { id: string; title: string }[];
   selectedDayId: string | null;
   onSelectDay: (id: string) => void;
   onDeleteDay?: (id: string) => void;
+  onRenameDay?: (id: string, newTitle: string) => void;
   completedDays: Set<string>;
   isAdmin?: boolean;
 }
 
-export function Sidebar({ days, selectedDayId, onSelectDay, onDeleteDay, completedDays, isAdmin }: SidebarProps) {
+export function Sidebar({ days, selectedDayId, onSelectDay, onDeleteDay, onRenameDay, completedDays, isAdmin }: SidebarProps) {
   return (
     <div className="w-64 lg:w-72 h-full bg-slate-900 border-r border-white/10 flex flex-col shadow-2xl">
       <div className="p-6">
@@ -47,19 +48,35 @@ export function Sidebar({ days, selectedDayId, onSelectDay, onDeleteDay, complet
                   {day.title}
                 </span>
               </div>
-              {isAdmin && onDeleteDay && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`¿Estás seguro de eliminar el "${day.title}"? Esta acción no se puede deshacer.`)) {
-                      onDeleteDay(day.id);
-                    }
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-md transition-all"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                {isAdmin && onRenameDay && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const newTitle = prompt("Nuevo nombre del contenido:", day.title);
+                      if (newTitle && newTitle.trim() && newTitle !== day.title) {
+                        onRenameDay(day.id, newTitle.trim());
+                      }
+                    }}
+                    className="p-1.5 hover:bg-sky-500/20 text-slate-500 hover:text-sky-400 rounded-md"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {isAdmin && onDeleteDay && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`¿Estás seguro de eliminar el "${day.title}"? Esta acción no se puede deshacer.`)) {
+                        onDeleteDay(day.id);
+                      }
+                    }}
+                    className="p-1.5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-md"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </button>
           ))}
         </nav>

@@ -152,6 +152,15 @@ export default function App() {
     }
   };
 
+  const handleRenameDay = async (dayId: string, newTitle: string) => {
+    if (userRole !== 'admin') return;
+    try {
+      await updateDoc(doc(db, 'days', dayId), { title: newTitle });
+    } catch (err) {
+      console.error("Error renaming day:", err);
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || userRole !== 'admin') return;
@@ -276,6 +285,7 @@ export default function App() {
             setIsMenuOpen(false);
           }}
           onDeleteDay={handleDeleteDay}
+          onRenameDay={handleRenameDay}
           completedDays={completedDays}
           isAdmin={userRole === 'admin'}
         />
