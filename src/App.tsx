@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { NotebookRenderer } from './components/NotebookRenderer';
 import { ExercisePanel } from './components/ExercisePanel';
 import { LoginModal } from './components/LoginModal';
+import { AdminManagementModal } from './components/AdminManagementModal';
 import { generateExercises, partitionDays } from './services/geminiService';
 import { Notebook, DayContent, Exercise, NotebookCell } from './types';
 import { cn } from './lib/utils';
@@ -27,6 +28,7 @@ export default function App() {
   const [exercises, setExercises] = useState<Record<string, Exercise[]>>({});
   const [isLoadingExercises, setIsLoadingExercises] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
   // Mobile states
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -336,14 +338,23 @@ export default function App() {
             </div>
 
             {userRole === 'admin' && (
-              <label className={cn(
-                "flex items-center gap-2 px-3 py-1.5 lg:px-5 lg:py-2.5 rounded-lg text-[10px] lg:text-xs font-bold transition-all cursor-pointer",
-                "bg-sky-400 text-slate-950 hover:bg-sky-300 active:scale-[0.98]"
-              )}>
-                <Upload className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{isUploading ? "..." : "Subir IPYNB"}</span>
-                <input type="file" accept=".ipynb" className="hidden" onChange={handleFileUpload} />
-              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsAdminModalOpen(true)}
+                  className="p-2 lg:p-2.5 rounded-lg bg-slate-800 text-sky-400 hover:bg-slate-700 transition-colors border border-white/5"
+                  title="Gestionar Administradores"
+                >
+                  <ShieldCheck className="w-4 h-4 lg:w-5 h-5" />
+                </button>
+                <label className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 lg:px-5 lg:py-2.5 rounded-lg text-[10px] lg:text-xs font-bold transition-all cursor-pointer",
+                  "bg-sky-400 text-slate-950 hover:bg-sky-300 active:scale-[0.98]"
+                )}>
+                  <Upload className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{isUploading ? "..." : "Subir IPYNB"}</span>
+                  <input type="file" accept=".ipynb" className="hidden" onChange={handleFileUpload} />
+                </label>
+              </div>
             )}
 
             {selectedDayId && !exercises[selectedDayId] && (
@@ -444,6 +455,10 @@ export default function App() {
           </aside>
         </div>
       </div>
+      <AdminManagementModal 
+        isOpen={isAdminModalOpen} 
+        onClose={() => setIsAdminModalOpen(false)} 
+      />
     </div>
   );
 }

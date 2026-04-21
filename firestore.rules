@@ -32,7 +32,10 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (request.auth.token.email == "andrezbuitrago82@gmail.com" && request.auth.token.email_verified == true);
+        (
+          (request.auth.token.email == "andrezbuitrago82@gmail.com" && request.auth.token.email_verified == true) ||
+          exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+        );
     }
 
     function isOwner(userId) {
@@ -42,6 +45,12 @@ service cloud.firestore {
     // ===============================================================
     // Rules
     // ===============================================================
+
+    // Admins Collection
+    match /admins/{email} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
 
     // Groups Management
     match /groups/{groupId} {
