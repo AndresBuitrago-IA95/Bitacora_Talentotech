@@ -57,28 +57,43 @@
         "lastOutput": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" }
       }
+    },
+    "Group": {
+      "title": "Bootcamp Group",
+      "description": "A cohort or group of students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
     }
   },
   "firestore": {
-    "/config/notebook": {
+    "/groups/{groupId}": {
+      "schema": "Group",
+      "description": "Main collection for bootcamp groups"
+    },
+    "/groups/{groupId}/config/notebook": {
       "schema": "NotebookMetadata",
-      "description": "Singleton for current notebook metadata"
+      "description": "Metadata for current group notebook"
     },
-    "/days/{dayId}": {
+    "/groups/{groupId}/days/{dayId}": {
       "schema": "Day",
-      "description": "Collection of available days/modules"
+      "description": "Collection of available days for this group"
     },
-    "/content/{dayId}": {
+    "/groups/{groupId}/content/{dayId}": {
       "schema": "object",
-      "description": "Stores the array of serialized cells for a day"
+      "description": "Notebook cells for a specific day in this group"
     },
-    "/exercises/{dayId}": {
+    "/groups/{groupId}/exercises/{dayId}": {
       "schema": "object",
-      "description": "Stores the array of exercises for a day"
+      "description": "AI exercises for a specific day in this group"
     },
     "/users/{userId}/progress/{exerciseId}": {
       "schema": "UserProgress",
-      "description": "Individual exercise completion status per user"
+      "description": "Individual exercise completion status per user (global for now)"
     }
   }
 }

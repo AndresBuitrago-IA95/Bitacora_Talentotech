@@ -18,6 +18,8 @@ import {
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userRole, setUserRole] = useState<'admin' | 'campista' | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [groupName, setGroupName] = useState<string>('');
   const [notebook, setNotebook] = useState<Notebook | null>(null);
   const [days, setDays] = useState<{ id: string; title: string; order: number; cellRange: [number, number] }[]>([]);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
@@ -25,11 +27,11 @@ export default function App() {
   const [exercises, setExercises] = useState<Record<string, Exercise[]>>({});
   const [isLoadingExercises, setIsLoadingExercises] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   // Mobile states
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'content' | 'exercises'>('content');
-  
+
   const completedDays = useMemo(() => {
     const set = new Set<string>();
     Object.entries(exercises).forEach(([dayId, dayExs]) => {
@@ -44,33 +46,40 @@ export default function App() {
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (u) {
-        // Auto-determine role if email matches admin
-        if (u.email === 'andrezbuitrago82@gmail.com') {
-          // If already logged in, we still might want the password confirmation 
-          // but for persistence, let's allow it
-          setUserRole('admin');
-        } else {
-          setUserRole('campista');
-        }
+      // We no longer auto-set role here without group selection
+      // But we can reset if u is gone
+      if (!u) {
+        setUserRole(null);
+        setSelectedGroupId(null);
       }
     });
   }, []);
 
-  // Sync Global Bootcamp Data
+  // Sync Global Bootcamp Data scoped by group
   useEffect(() => {
+    if (!selectedGroupId) {
+      setNotebook(null);
+      setDays([]);
+      setSelectedDayId(null);
+      return;
+    }
+
+    // 0. Fetch Group Name
+    getDoc(doc(db, 'groups', selectedGroupId)).then(snap => {
+      if (snap.exists()) setGroupName(snap.data().name);
+    });
+
     // 1. Sync Notebook Metadata
-    const unsubMeta = onSnapshot(doc(db, 'config', 'notebook'), (snap) => {
+    const unsubMeta = onSnapshot(doc(db, 'groups', selectedGroupId, 'config', 'notebook'), (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        setNotebook({ cells: [], metadata: {} } as any); // Marker that we have a notebook
+        setNotebook({ cells: [], metadata: {} } as any); 
       } else {
         setNotebook(null);
       }
     });
 
     // 2. Sync Days list
-    const unsubDays = onSnapshot(collection(db, 'days'), (snap) => {
+    const unsubDays = onSnapshot(collection(db, 'groups', selectedGroupId, 'days'), (snap) => {
       const daysList = snap.docs.map(d => d.data() as any).sort((a, b) => a.order - b.order);
       setDays(daysList);
       if (!selectedDayId && daysList.length > 0) setSelectedDayId(daysList[0].id);
@@ -80,19 +89,19 @@ export default function App() {
       unsubMeta();
       unsubDays();
     };
-  }, [selectedDayId]);
+  }, [selectedGroupId, selectedDayId]);
 
   // Sync Current Day Content & Exercises
   useEffect(() => {
-    if (!selectedDayId) return;
+    if (!selectedDayId || !selectedGroupId) return;
 
-    const unsubContent = onSnapshot(doc(db, 'content', selectedDayId), (snap) => {
+    const unsubContent = onSnapshot(doc(db, 'groups', selectedGroupId, 'content', selectedDayId), (snap) => {
       if (snap.exists()) {
         setDayContents(prev => ({ ...prev, [selectedDayId]: snap.data().cells }));
       }
     });
 
-    const unsubExs = onSnapshot(doc(db, 'exercises', selectedDayId), (snap) => {
+    const unsubExs = onSnapshot(doc(db, 'groups', selectedGroupId, 'exercises', selectedDayId), (snap) => {
       if (snap.exists()) {
         setExercises(prev => ({ ...prev, [selectedDayId]: snap.data().exercises }));
       }
@@ -102,45 +111,39 @@ export default function App() {
       unsubContent();
       unsubExs();
     };
-  }, [selectedDayId]);
+  }, [selectedDayId, selectedGroupId]);
 
-  // Sync User Progress
+  // Sync User Progress (Scoped by user and group)
   useEffect(() => {
-    if (!user) return;
+    if (!user || !selectedGroupId) return;
 
-    const unsubProgress = onSnapshot(collection(db, 'users', user.uid, 'progress'), (snap) => {
+    const unsubProgress = onSnapshot(collection(db, 'users', user.uid, 'groups', selectedGroupId, 'progress'), (snap) => {
       const completedIds = snap.docs.filter(d => d.data().completed).map(d => d.id);
       
       // Update exercises status based on progress
       setExercises(prev => {
         const next = { ...prev };
         Object.keys(next).forEach(dayId => {
-          next[dayId] = next[dayId].map(ex => ({
+          next[dayId] = (next[dayId] || []).map(ex => ({
             ...ex,
             completed: completedIds.includes(ex.id) || ex.completed
           }));
         });
         return next;
       });
-
-      // Update completed days (if all day exercises are in completedIds)
-      // This is a bit complex in real-time, but let's approximate
     });
 
     return () => unsubProgress();
-  }, [user]);
+  }, [user, selectedGroupId]);
 
   const handleDeleteDay = async (dayId: string) => {
-    if (userRole !== 'admin') return;
+    if (userRole !== 'admin' || !selectedGroupId) return;
     
     try {
       const batch = writeBatch(db);
-      // Delete from days collection
-      batch.delete(doc(db, 'days', dayId));
-      // Delete from content collection
-      batch.delete(doc(db, 'content', dayId));
-      // Delete from exercises collection
-      batch.delete(doc(db, 'exercises', dayId));
+      batch.delete(doc(db, 'groups', selectedGroupId, 'days', dayId));
+      batch.delete(doc(db, 'groups', selectedGroupId, 'content', dayId));
+      batch.delete(doc(db, 'groups', selectedGroupId, 'exercises', dayId));
       
       await batch.commit();
       
@@ -153,9 +156,9 @@ export default function App() {
   };
 
   const handleRenameDay = async (dayId: string, newTitle: string) => {
-    if (userRole !== 'admin') return;
+    if (userRole !== 'admin' || !selectedGroupId) return;
     try {
-      await updateDoc(doc(db, 'days', dayId), { title: newTitle });
+      await updateDoc(doc(db, 'groups', selectedGroupId, 'days', dayId), { title: newTitle });
     } catch (err) {
       console.error("Error renaming day:", err);
     }
@@ -163,7 +166,7 @@ export default function App() {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || userRole !== 'admin') return;
+    if (!file || userRole !== 'admin' || !selectedGroupId) return;
 
     setIsUploading(true);
     try {
@@ -171,16 +174,13 @@ export default function App() {
       const nb: Notebook = JSON.parse(text);
       const partitioned = await partitionDays(nb.cells);
 
-      // Persist to Firestore
       const batch = writeBatch(db);
       
-      // Get current days count to append correctly
-      const existingDaysQuery = await getDocs(collection(db, 'days'));
+      const existingDaysQuery = await getDocs(collection(db, 'groups', selectedGroupId, 'days'));
       const existingCount = existingDaysQuery.size;
       const currentMaxOrder = existingDaysQuery.docs.reduce((max, d) => Math.max(max, d.data().order ?? 0), -1);
 
-      // Update metadata (append to existing context)
-      batch.set(doc(db, 'config', 'notebook'), {
+      batch.set(doc(db, 'groups', selectedGroupId, 'config', 'notebook'), {
         title: file.name,
         lastUpdated: serverTimestamp(),
         totalDays: existingCount + partitioned.length
@@ -191,16 +191,13 @@ export default function App() {
         const dayId = `day-${newIndex}`;
         const order = currentMaxOrder + index + 1;
         
-        batch.set(doc(db, 'days', dayId), { ...day, id: dayId, order: order });
+        batch.set(doc(db, 'groups', selectedGroupId, 'days', dayId), { ...day, id: dayId, order: order });
         
-        // Split cells per day
         const cells = nb.cells.slice(day.cellRange[0], day.cellRange[1]);
-        batch.set(doc(db, 'content', dayId), { cells });
+        batch.set(doc(db, 'groups', selectedGroupId, 'content', dayId), { cells });
       });
 
       await batch.commit();
-      
-      // Select the first of the newly added days
       setSelectedDayId(`day-${existingCount + 1}`);
     } catch (error) {
       console.error("Error persistenting notebook:", error);
@@ -215,12 +212,12 @@ export default function App() {
   }, [dayContents, selectedDayId]);
 
   const handleGenerateExercises = async () => {
-    if (!selectedDayId || !selectedDayCells.length) return;
+    if (!selectedDayId || !selectedDayCells.length || !selectedGroupId) return;
     
     setIsLoadingExercises(true);
     try {
       const generated = await generateExercises(selectedDayCells);
-      await setDoc(doc(db, 'exercises', selectedDayId), { exercises: generated });
+      await setDoc(doc(db, 'groups', selectedGroupId, 'exercises', selectedDayId), { exercises: generated });
     } catch (err) {
       console.error("Error generating/saving exercises:", err);
     } finally {
@@ -242,7 +239,7 @@ export default function App() {
 
     // Persistent update for user progress
     try {
-      await setDoc(doc(db, 'users', user.uid, 'progress', exId), {
+      await setDoc(doc(db, 'users', user.uid, 'groups', selectedGroupId, 'progress', exId), {
         completed: true,
         userCode,
         output,
@@ -256,10 +253,17 @@ export default function App() {
   const handleLogout = async () => {
     await logout();
     setUserRole(null);
+    setSelectedGroupId(null);
+    setNotebook(null);
+    setDays([]);
+    setSelectedDayId(null);
   };
 
-  if (!userRole) {
-    return <LoginModal onLogin={setUserRole} />;
+  if (!userRole || !selectedGroupId) {
+    return <LoginModal onLogin={(role, groupId) => {
+      setUserRole(role);
+      setSelectedGroupId(groupId);
+    }} />;
   }
 
   return (
@@ -288,6 +292,7 @@ export default function App() {
           onRenameDay={handleRenameDay}
           completedDays={completedDays}
           isAdmin={userRole === 'admin'}
+          groupName={groupName}
         />
       </div>
 

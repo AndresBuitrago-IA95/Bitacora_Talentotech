@@ -43,32 +43,39 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
-    // Notebook Config
-    match /config/notebook {
-      allow read: if true; // Publicly readable to see the bootcamp
-      allow write: if isAdmin();
-    }
-
-    // Day Metadata
-    match /days/{dayId} {
+    // Groups Management
+    match /groups/{groupId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+      
+      // Scoped Config
+      match /config/notebook {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+
+      // Scoped Days
+      match /days/{dayId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+
+      // Scoped Content
+      match /content/{dayId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+
+      // Scoped Exercises
+      match /exercises/{dayId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
     }
 
-    // Day Content (Cells)
-    match /content/{dayId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // AI Exercises
-    match /exercises/{dayId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // User Progress
-    match /users/{userId}/progress/{exerciseId} {
+    // User Progress (Scoped by user and group for isolation)
+    match /users/{userId}/groups/{groupId}/progress/{exerciseId} {
       allow read: if isOwner(userId) || isAdmin();
       allow write: if isOwner(userId);
     }

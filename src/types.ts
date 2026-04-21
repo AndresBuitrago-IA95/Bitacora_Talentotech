@@ -19,6 +19,12 @@ export interface DayContent {
   cells: NotebookCell[];
 }
 
+export interface Group {
+  id: string;
+  name: string;
+  createdAt: any;
+}
+
 export interface Exercise {
   id: string;
   title: string;

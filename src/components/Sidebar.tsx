@@ -10,18 +10,25 @@ interface SidebarProps {
   onRenameDay?: (id: string, newTitle: string) => void;
   completedDays: Set<string>;
   isAdmin?: boolean;
+  groupName?: string;
 }
 
-export function Sidebar({ days, selectedDayId, onSelectDay, onDeleteDay, onRenameDay, completedDays, isAdmin }: SidebarProps) {
+export function Sidebar({ days, selectedDayId, onSelectDay, onDeleteDay, onRenameDay, completedDays, isAdmin, groupName }: SidebarProps) {
   return (
     <div className="w-64 lg:w-72 h-full bg-slate-900 border-r border-white/10 flex flex-col shadow-2xl">
       <div className="p-6">
-        <div className="flex items-center justify-between gap-2 mb-8">
+        <div className="flex items-center justify-between gap-2 mb-4">
           <div className="text-xl font-black tracking-tighter text-sky-400 italic">
             PY-LOGBOOK
           </div>
-          {/* Mobile close button is handled by overlay click, but we can add an icon if needed */}
         </div>
+
+        {groupName && (
+          <div className="mb-8 px-1">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">GRUPO</div>
+            <div className="text-xs font-bold text-sky-400/80 truncate">{groupName}</div>
+          </div>
+        )}
         
         <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 px-1">
           NAVEGACIÓN

@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Lock, User, ShieldCheck, GraduationCap, ArrowRight, AlertCircle, Chrome, Zap } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { loginWithGoogle, loginAnonymously, auth } from '../services/firebase';
+import { loginWithGoogle, loginAnonymously, auth, db } from '../services/firebase';
+import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Group } from '../types';
 
 type Role = 'admin' | 'campista';
 
 interface LoginModalProps {
-  onLogin: (role: Role) => void;
+  onLogin: (role: Role, groupId: string) => void;
 }
 
 export function LoginModal({ onLogin }: LoginModalProps) {
@@ -15,15 +17,63 @@ export function LoginModal({ onLogin }: LoginModalProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [newGroupName, setNewGroupName] = useState('');
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+
+  React.useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'groups'));
+        const groupsList = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
+        setGroups(groupsList);
+        if (groupsList.length > 0) {
+          setSelectedGroupId(groupsList[0].id);
+        }
+      } catch (err) {
+        console.error("Error fetching groups:", err);
+      }
+    };
+    fetchGroups();
+  }, []);
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) return;
+    setIsCreatingGroup(true);
+    try {
+      const docRef = await addDoc(collection(db, 'groups'), {
+        name: newGroupName.trim(),
+        createdAt: serverTimestamp()
+      });
+      const newGroup = { id: docRef.id, name: newGroupName.trim(), createdAt: new Date() };
+      setGroups(prev => [...prev, newGroup]);
+      setSelectedGroupId(docRef.id);
+      setNewGroupName('');
+    } catch (err) {
+      console.error("Error creating group:", err);
+      setError("No se pudo crear el grupo.");
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedGroupId && role === 'campista') {
+      setError('Por favor selecciona un grupo.');
+      return;
+    }
+    if (!selectedGroupId && role === 'admin') {
+      setError('Debes seleccionar o crear un grupo para gestionar.');
+      return;
+    }
+
     setIsAuthenticating(true);
     setError('');
 
     try {
       if (role === 'admin') {
-        // First check password to avoid unnecessary popups
         if (password !== 'Ingeniero95*') {
           setError('Contraseña administrativa incorrecta.');
           setIsAuthenticating(false);
@@ -34,14 +84,13 @@ export function LoginModal({ onLogin }: LoginModalProps) {
         const user = result.user;
 
         if (user.email === 'andrezbuitrago82@gmail.com') {
-          onLogin('admin');
+          onLogin('admin', selectedGroupId);
         } else {
           setError(`El correo ${user.email} no tiene permisos de admin.`);
         }
       } else {
-        // Campista uses anonymous login for simplicity and persistence
         await loginAnonymously();
-        onLogin('campista');
+        onLogin('campista', selectedGroupId);
       }
     } catch (err: any) {
       console.error("Auth error:", err);
@@ -108,6 +157,49 @@ export function LoginModal({ onLogin }: LoginModalProps) {
               <ShieldCheck className="w-6 h-6" />
               <span className="text-xs font-bold uppercase tracking-widest">Admin</span>
             </button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">
+                {role === 'admin' ? 'Gestionar Grupo' : 'Selecciona tu Grupo'}
+              </label>
+              <select
+                value={selectedGroupId}
+                onChange={(e) => setSelectedGroupId(e.target.value)}
+                className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-sky-400/30 outline-none transition-all text-sm"
+              >
+                <option value="" disabled>-- Seleccionar Grupo --</option>
+                {groups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {role === 'admin' && (
+              <div className="pt-2 space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">
+                  Crear Nuevo Grupo
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Nombre del grupo..."
+                    className="flex-1 bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-white placeholder:text-slate-800 text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateGroup}
+                    disabled={isCreatingGroup || !newGroupName.trim()}
+                    className="bg-emerald-500 text-slate-950 px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider disabled:opacity-50"
+                  >
+                    {isCreatingGroup ? "..." : "Crear"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <AnimatePresence mode="wait">
