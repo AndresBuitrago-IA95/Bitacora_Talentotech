@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, UserPlus, Trash2, X, Search, AlertCircle, Loader2 } from 'lucide-react';
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -45,13 +45,18 @@ export function AdminManagementModal({ isOpen, onClose }: AdminManagementModalPr
     try {
       const email = newAdminEmail.trim().toLowerCase();
       await setDoc(doc(db, 'admins', email), {
-        addedAt: serverTimestamp()
+        addedAt: serverTimestamp(),
+        addedBy: auth.currentUser?.email
       });
-      setAdmins(prev => [...prev, email]);
+      setAdmins(prev => Array.from(new Set([...prev, email])));
       setNewAdminEmail('');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error adding admin:", err);
-      setError("No tienes permisos suficientes o hubo un error al añadir al administrador.");
+      if (err.code === 'permission-denied') {
+        setError("Error de permisos: No estás autorizado para añadir administradores. Asegúrate de haber iniciado sesión con el correo correcto.");
+      } else {
+        setError(`Error: ${err.message || "No se pudo añadir al administrador."}`);
+      }
     } finally {
       setIsUpdating(false);
     }
