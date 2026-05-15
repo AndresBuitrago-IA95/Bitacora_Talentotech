@@ -85,3 +85,42 @@ export async function partitionDays(cells: NotebookCell[]): Promise<{ id: string
 
   return days;
 }
+
+export async function convertDocToNotebook(fileName: string, content: string): Promise<NotebookCell[] | null> {
+  const prompt = `
+    I have extracted the following text from a file named "${fileName}". 
+    Your task is to determine if this text contains Python code blocks or technical instructions that should be executed.
+    
+    GUIDELINES:
+    - If you find Python code (even if it's just a few snippets) or structured technical content that looks like a tutorial: 
+      Convert it into an array of Jupyter Notebook cells.
+      Markdown cells for text, code cells for Python.
+      Keep headings as H1 (#) or H2 (##) to help the partitioner.
+    - If it's just general information, a non-technical presentation, or text without any code: Return "null".
+    
+    IMPORTANT: Return ONLY the JSON array of cells or the word null. Do not include markdown code blocks around your JSON.
+    
+    TEXT:
+    ${content.slice(0, 30000)}
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+      },
+    });
+
+    const result = JSON.parse(response.text || "null");
+    if (result === null) return null;
+    
+    // Ensure it's an array of cells
+    if (Array.isArray(result)) return result;
+    return null;
+  } catch (error) {
+    console.error("Error converting doc to notebook:", error);
+    return null;
+  }
+}

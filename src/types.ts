@@ -36,6 +36,17 @@ export interface Exercise {
   error?: string;
 }
 
+export interface Resource {
+  id: string;
+  title: string;
+  type: 'pdf' | 'pptx' | 'image' | 'text' | 'other';
+  content: string;
+  url?: string;
+  originalName?: string;
+  mimeType?: string;
+  createdAt: any;
+}
+
 export interface ApplicationState {
   notebook: Notebook | null;
   days: DayContent[];

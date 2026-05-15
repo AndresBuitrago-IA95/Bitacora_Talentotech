@@ -34,7 +34,8 @@ service cloud.firestore {
       return isAuthenticated() && 
         (
           request.auth.token.email == "andrezbuitrago82@gmail.com" ||
-          exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+          exists(/databases/$(database)/documents/admins/$(request.auth.token.email)) ||
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid))
         );
     }
 
@@ -78,6 +79,12 @@ service cloud.firestore {
 
       // Scoped Exercises
       match /exercises/{dayId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+
+      // Scoped Resources
+      match /resources/{resId} {
         allow read: if true;
         allow write: if isAdmin();
       }
